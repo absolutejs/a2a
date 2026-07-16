@@ -7,7 +7,7 @@ export const manifest = defineManifest<Record<string, never>>()({
     accent: "#8b5cf6",
     category: "ai",
     description:
-      "A2A Protocol 1.0 JSON-RPC client and server with Agent Card discovery, version negotiation, caller-bound durable tasks, and approval-resumable AbsoluteJS Agency enforcement.",
+      "Production A2A Protocol 1.0 client and server with hardened discovery, streaming, subscriptions, caller-bound durable tasks and push configuration, plus approval-resumable Agency enforcement.",
     docsUrl: "https://github.com/absolutejs/a2a",
     name: "@absolutejs/a2a",
     tagline:

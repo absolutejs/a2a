@@ -67,6 +67,12 @@ export type A2aTask = {
   status: { message?: A2aMessage; state: A2aTaskState; timestamp?: string };
 };
 
+export type A2aStreamResponse =
+  | { artifactUpdate: Record<string, unknown> }
+  | { message: A2aMessage }
+  | { statusUpdate: Record<string, unknown> }
+  | { task: A2aTask };
+
 export type A2aAgentInterface = {
   protocolBinding: "JSONRPC" | "GRPC" | "HTTP+JSON" | (string & {});
   protocolVersion: string;
@@ -140,6 +146,56 @@ export type A2aCancelTaskRequest = {
   tenant?: string;
 };
 
+export type A2aListTasksRequest = {
+  contextId?: string;
+  historyLength?: number;
+  includeArtifacts?: boolean;
+  pageSize?: number;
+  pageToken?: string;
+  status?: A2aTaskState;
+  statusTimestampAfter?: string;
+  tenant?: string;
+};
+
+export type A2aListTasksResponse = {
+  nextPageToken: string;
+  pageSize: number;
+  tasks: A2aTask[];
+  totalSize: number;
+};
+
+export type A2aPushNotificationConfig = {
+  authentication?: { credentials?: string; scheme: string };
+  id?: string;
+  taskId?: string;
+  token?: string;
+  url: string;
+};
+
+export type A2aPushNotificationConfigStore = {
+  create: (
+    config: A2aPushNotificationConfig,
+    authorizationKey: string,
+  ) => Promise<A2aPushNotificationConfig> | A2aPushNotificationConfig;
+  delete: (
+    taskId: string,
+    id: string,
+    authorizationKey: string,
+  ) => Promise<boolean> | boolean;
+  get: (
+    taskId: string,
+    id: string,
+    authorizationKey: string,
+  ) =>
+    | Promise<A2aPushNotificationConfig | undefined>
+    | A2aPushNotificationConfig
+    | undefined;
+  list: (
+    taskId: string,
+    authorizationKey: string,
+  ) => Promise<A2aPushNotificationConfig[]> | A2aPushNotificationConfig[];
+};
+
 export type A2aTaskStore = {
   cancel: (
     id: string,
@@ -147,7 +203,10 @@ export type A2aTaskStore = {
     now: string,
   ) => Promise<A2aTask | undefined>;
   get: (id: string, authorizationKey: string) => Promise<A2aTask | undefined>;
-  list: (authorizationKey: string) => Promise<A2aTask[]>;
+  list: (
+    authorizationKey: string,
+    request: A2aListTasksRequest,
+  ) => Promise<A2aListTasksResponse>;
   save: (task: A2aTask, authorizationKey: string) => Promise<void>;
 };
 
@@ -181,10 +240,27 @@ export type A2aServerConfig<Caller> = {
     params: A2aCancelTaskRequest,
     context: A2aRequestContext<Caller>,
   ) => Promise<A2aTask> | A2aTask;
+  /** Authenticated card with additional private skills or capabilities. */
+  extendedAgentCard?:
+    | A2aAgentCard
+    | ((
+        context: A2aRequestContext<Caller>,
+      ) => Promise<A2aAgentCard> | A2aAgentCard);
+  /** Maximum JSON-RPC request body size in bytes (default 1 MiB). */
+  maxRequestBytes?: number;
   path?: string;
+  pushNotifications?: { store: A2aPushNotificationConfigStore };
   sendMessage: (
     params: A2aSendMessageRequest,
     context: A2aRequestContext<Caller>,
   ) => Promise<A2aSendMessageResponse> | A2aSendMessageResponse;
+  sendStreamingMessage?: (
+    params: A2aSendMessageRequest,
+    context: A2aRequestContext<Caller>,
+  ) => AsyncIterable<A2aStreamResponse>;
+  subscribeToTask?: (
+    task: A2aTask,
+    context: A2aRequestContext<Caller>,
+  ) => AsyncIterable<A2aStreamResponse>;
   taskStore: A2aTaskStore;
 };

@@ -1,12 +1,12 @@
 {
   "name": "@absolutejs/a2a",
-  "version": "0.1.0",
-  "description": "A2A Protocol 1.0 JSON-RPC server and client with durable tasks and AbsoluteJS Agency enforcement.",
+  "version": "0.2.0",
+  "description": "Production A2A Protocol 1.0 client and server with streaming, durable tasks, push configuration, and Agency enforcement.",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/absolutejs/a2a.git"
+    "url": "git+https://github.com/absolutejs/a2a.git"
   },
   "publishConfig": {
     "access": "public"
@@ -40,8 +40,8 @@
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@absolutejs/agency": "^0.3.0",
-    "@absolutejs/manifest": "^0.2.0",
+    "@absolutejs/agency": "^0.4.0",
+    "@absolutejs/manifest": "^0.3.0",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {

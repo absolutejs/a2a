@@ -39,6 +39,17 @@ const taskOf = (row: TaskRow | undefined) => {
   ) as A2aTask;
 };
 
+const pageOffset = (token?: string) => {
+  if (token === undefined || token === "") return 0;
+  try {
+    const value = Number.parseInt(atob(token), 10);
+    if (Number.isSafeInteger(value) && value >= 0) return value;
+  } catch {
+    // handled below
+  }
+  throw new Error("Invalid A2A page token");
+};
+
 export const createPostgresA2aTaskStore = ({
   client,
   namespace = "a2a",
@@ -65,13 +76,59 @@ export const createPostgresA2aTaskStore = ({
           )
         ).rows[0],
       ),
-    list: async (authorizationKey) =>
-      (
-        await client.query<TaskRow>(
-          `SELECT data FROM ${ns}.tasks WHERE authorization_key = $1 ORDER BY updated_at DESC`,
-          [authorizationKey],
-        )
-      ).rows.map((row) => taskOf(row) as A2aTask),
+    list: async (authorizationKey, request) => {
+      const offset = pageOffset(request.pageToken);
+      const pageSize = Math.min(100, Math.max(1, request.pageSize ?? 50));
+      if (
+        request.statusTimestampAfter !== undefined &&
+        !Number.isFinite(Date.parse(request.statusTimestampAfter))
+      ) {
+        throw new Error("Invalid statusTimestampAfter");
+      }
+      const values = [
+        authorizationKey,
+        request.contextId ?? null,
+        request.status ?? null,
+        request.statusTimestampAfter ?? null,
+        pageSize,
+        offset,
+      ];
+      const where = `authorization_key = $1
+        AND ($2::text IS NULL OR context_id = $2)
+        AND ($3::text IS NULL OR state = $3)
+        AND ($4::timestamptz IS NULL OR updated_at >= $4::timestamptz)`;
+      const [rows, count] = await Promise.all([
+        client.query<TaskRow>(
+          `SELECT data FROM ${ns}.tasks WHERE ${where} ORDER BY updated_at DESC LIMIT $5 OFFSET $6`,
+          values,
+        ),
+        client.query<{ count: string | number }>(
+          `SELECT count(*)::text AS count FROM ${ns}.tasks WHERE ${where}`,
+          values.slice(0, 4),
+        ),
+      ]);
+      const totalSize = Number(count.rows[0]?.count ?? 0);
+      const tasks = rows.rows.map((row) => {
+        const task = structuredClone(taskOf(row) as A2aTask);
+        if (request.includeArtifacts !== true) delete task.artifacts;
+        if (request.historyLength !== undefined) {
+          task.history =
+            request.historyLength === 0
+              ? []
+              : task.history?.slice(-request.historyLength);
+        }
+        return task;
+      });
+      return {
+        nextPageToken:
+          offset + tasks.length < totalSize
+            ? btoa(String(offset + tasks.length))
+            : "",
+        pageSize,
+        tasks,
+        totalSize,
+      };
+    },
     save: async (task, authorizationKey) => {
       const result = await client.query<{ task_id: string }>(
         `INSERT INTO ${ns}.tasks (task_id, authorization_key, context_id, state, data) VALUES ($1,$2,$3,$4,$5::jsonb)

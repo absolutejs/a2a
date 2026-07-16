@@ -10,6 +10,7 @@ import {
   A2aClientError,
   createA2aClient,
   createA2aHandler,
+  createMemoryA2aPushNotificationConfigStore,
   createMemoryA2aTaskStore,
   discoverA2aAgent,
   type A2aAgentCard,
@@ -196,5 +197,236 @@ describe("A2A 1.0 server and client", () => {
     });
     expect(resumed.task?.id).toBe("task-approval");
     expect((await agency.inspect()).receipts).toHaveLength(1);
+  });
+
+  test("supports streaming, subscriptions, task filters, push configs, and extended cards", async () => {
+    const productionCard: A2aAgentCard = {
+      ...card,
+      capabilities: {
+        extendedAgentCard: true,
+        pushNotifications: true,
+        streaming: true,
+      },
+    };
+    const extendedCard: A2aAgentCard = {
+      ...productionCard,
+      name: "Test (authenticated)",
+      skills: [
+        {
+          description: "A private authenticated capability",
+          id: "private",
+          name: "Private skill",
+          tags: ["private"],
+        },
+      ],
+    };
+    const handler = createA2aHandler({
+      agentCard: productionCard,
+      authorize: () => ({
+        actor: { agentId: "agent", scopes: ["a2a"], userId: "user" },
+        authorizationKey: "user",
+        caller: {},
+        ok: true,
+      }),
+      extendedAgentCard: extendedCard,
+      pushNotifications: {
+        store: createMemoryA2aPushNotificationConfigStore(),
+      },
+      sendMessage: ({ message }) => ({
+        task: task(`task-${message.messageId}`),
+      }),
+      sendStreamingMessage: async function* ({ message }) {
+        yield { task: task(`stream-${message.messageId}`) };
+        yield {
+          statusUpdate: {
+            final: false,
+            status: { state: "TASK_STATE_WORKING" },
+            taskId: `stream-${message.messageId}`,
+          },
+        };
+      },
+      subscribeToTask: async function* (subscribed) {
+        yield {
+          statusUpdate: {
+            final: true,
+            status: { state: "TASK_STATE_COMPLETED" },
+            taskId: subscribed.id,
+          },
+        };
+      },
+      taskStore: createMemoryA2aTaskStore(),
+    });
+    const localFetch = async (input: RequestInfo | URL, init?: RequestInit) =>
+      (await handler(new Request(input, init))) ??
+      new Response(null, { status: 404 });
+    const client = createA2aClient({
+      agentCard: productionCard,
+      fetch: localFetch,
+    });
+
+    await client.sendMessage({
+      message: {
+        messageId: "features",
+        parts: [{ text: "test all features" }],
+        role: "ROLE_USER",
+      },
+    });
+    const listed = await client.listTasks({
+      contextId: "context-1",
+      includeArtifacts: false,
+      pageSize: 1,
+      status: "TASK_STATE_WORKING",
+    });
+    expect(listed.tasks.map((entry) => entry.id)).toEqual(["task-features"]);
+    expect(listed).toMatchObject({ pageSize: 1, totalSize: 1 });
+
+    const streamed = [];
+    for await (const event of client.sendStreamingMessage({
+      message: {
+        messageId: "features",
+        parts: [{ text: "stream" }],
+        role: "ROLE_USER",
+      },
+    })) {
+      streamed.push(event);
+    }
+    expect(streamed).toHaveLength(2);
+
+    const subscribed = [];
+    for await (const event of client.subscribeToTask("task-features")) {
+      subscribed.push(event);
+    }
+    expect(subscribed).toHaveLength(2);
+    expect(subscribed[0]).toMatchObject({ task: { id: "task-features" } });
+
+    const created = await client.createPushNotificationConfig({
+      taskId: "task-features",
+      token: "verification-secret",
+      url: "https://hooks.example/a2a",
+    });
+    expect(created.id).toBeString();
+    expect(
+      await client.getPushNotificationConfig(
+        "task-features",
+        created.id as string,
+      ),
+    ).toEqual(created);
+    expect(
+      (await client.listPushNotificationConfigs("task-features")).configs,
+    ).toEqual([created]);
+    await client.deletePushNotificationConfig(
+      "task-features",
+      created.id as string,
+    );
+    expect(
+      (await client.listPushNotificationConfigs("task-features")).configs,
+    ).toEqual([]);
+    expect((await client.getExtendedAgentCard()).name).toBe(
+      "Test (authenticated)",
+    );
+
+    await expect(
+      client.createPushNotificationConfig({
+        taskId: "task-features",
+        url: "http://public.example/hook",
+      }),
+    ).rejects.toMatchObject({ code: -32602 });
+  });
+
+  test("enforces content, size, and required extension boundaries", async () => {
+    const requiredCard: A2aAgentCard = {
+      ...card,
+      capabilities: {
+        extensions: [
+          {
+            required: true,
+            uri: "https://extensions.example/required/v1",
+          },
+        ],
+      },
+    };
+    const handler = createA2aHandler({
+      agentCard: requiredCard,
+      authorize: () => ({
+        actor: { agentId: "agent", scopes: ["a2a"], userId: "user" },
+        authorizationKey: "user",
+        caller: {},
+        ok: true,
+      }),
+      maxRequestBytes: 64,
+      sendMessage: ({ message }) => ({ task: task(message.messageId) }),
+      taskStore: createMemoryA2aTaskStore(),
+    });
+    const base = {
+      body: JSON.stringify({ id: 1, jsonrpc: "2.0", method: "ListTasks" }),
+      headers: { "a2a-version": "1.0" },
+      method: "POST",
+    };
+    expect(
+      await (
+        await handler(new Request("https://agent.test/a2a", base))
+      )?.json(),
+    ).toMatchObject({ error: { code: -32005 } });
+    expect(
+      await (
+        await handler(
+          new Request("https://agent.test/a2a", {
+            ...base,
+            body: JSON.stringify({ padding: "x".repeat(100) }),
+            headers: {
+              ...base.headers,
+              "content-type": "application/json",
+            },
+          }),
+        )
+      )?.json(),
+    ).toMatchObject({ error: { code: -32600 } });
+    expect(
+      await (
+        await handler(
+          new Request("https://agent.test/a2a", {
+            ...base,
+            headers: {
+              ...base.headers,
+              "content-type": "application/json",
+            },
+          }),
+        )
+      )?.json(),
+    ).toMatchObject({ error: { code: -32008 } });
+  });
+
+  test("rejects insecure origins and malformed discovery documents", async () => {
+    await expect(discoverA2aAgent("http://agent.example")).rejects.toThrow(
+      "HTTPS",
+    );
+    await expect(
+      discoverA2aAgent("https://agent.example", {
+        fetch: async () =>
+          new Response(JSON.stringify({ name: "incomplete" }), {
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    ).rejects.toThrow("missing required fields");
+    await expect(
+      discoverA2aAgent("https://agent.example", {
+        fetch: async () =>
+          new Response("x".repeat(100), {
+            headers: { "content-type": "application/json" },
+          }),
+        maxResponseBytes: 10,
+      }),
+    ).rejects.toThrow("too large");
+  });
+
+  test("refuses capability claims without corresponding server configuration", () => {
+    expect(() =>
+      createA2aHandler({
+        agentCard: { ...card, capabilities: { pushNotifications: true } },
+        authorize: () => ({ ok: false }),
+        sendMessage: ({ message }) => ({ task: task(message.messageId) }),
+        taskStore: createMemoryA2aTaskStore(),
+      }),
+    ).toThrow("no push store");
   });
 });
