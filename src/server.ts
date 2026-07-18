@@ -278,6 +278,7 @@ export const createA2aHandler = <Caller>(config: A2aServerConfig<Caller>) => {
       authorizationKey: auth.authorizationKey,
       caller: auth.caller,
       request,
+      ...(auth.taskLabels === undefined ? {} : { taskLabels: auth.taskLabels }),
     };
     const requiredExtensions = (card.capabilities.extensions ?? [])
       .filter((extension) => extension.required === true)
@@ -322,7 +323,11 @@ export const createA2aHandler = <Caller>(config: A2aServerConfig<Caller>) => {
               context,
             );
             if (sent.task) {
-              await config.taskStore.save(sent.task, context.authorizationKey);
+              await config.taskStore.save(
+                sent.task,
+                context.authorizationKey,
+                context.taskLabels,
+              );
             }
             return sent;
           },
@@ -350,7 +355,11 @@ export const createA2aHandler = <Caller>(config: A2aServerConfig<Caller>) => {
         const persisted = (async function* () {
           for await (const event of events) {
             if ("task" in event) {
-              await config.taskStore.save(event.task, context.authorizationKey);
+              await config.taskStore.save(
+                event.task,
+                context.authorizationKey,
+                context.taskLabels,
+              );
             }
             yield event;
           }
@@ -414,7 +423,11 @@ export const createA2aHandler = <Caller>(config: A2aServerConfig<Caller>) => {
         );
         if (!task) return errorResponse(id, -32002, "Task not cancelable");
         if (config.cancelTask) {
-          await config.taskStore.save(task, context.authorizationKey);
+          await config.taskStore.save(
+            task,
+            context.authorizationKey,
+            context.taskLabels,
+          );
         }
         return resultResponse(id, task);
       }

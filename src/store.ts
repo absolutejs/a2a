@@ -1,4 +1,10 @@
-import type { A2aTask, A2aTaskStore } from "./types";
+import type {
+  A2aOperatorTask,
+  A2aTask,
+  A2aTaskLabels,
+  A2aTaskOperatorStore,
+  A2aTaskStore,
+} from "./types";
 
 const pageOffset = (token?: string) => {
   if (token === undefined || token === "") return 0;
@@ -32,8 +38,12 @@ const terminal = new Set([
   "TASK_STATE_REJECTED",
 ]);
 
-export const createMemoryA2aTaskStore = (): A2aTaskStore => {
-  const rows = new Map<string, { authorizationKey: string; task: A2aTask }>();
+export const createMemoryA2aTaskStore = (): A2aTaskStore &
+  A2aTaskOperatorStore => {
+  const rows = new Map<
+    string,
+    { authorizationKey: string; labels: A2aTaskLabels; task: A2aTask }
+  >();
   return {
     cancel: async (id, authorizationKey, now) => {
       const row = rows.get(id);
@@ -43,7 +53,11 @@ export const createMemoryA2aTaskStore = (): A2aTaskStore => {
         ...row.task,
         status: { state: "TASK_STATE_CANCELED", timestamp: now },
       };
-      rows.set(id, { authorizationKey, task: structuredClone(task) });
+      rows.set(id, {
+        authorizationKey,
+        labels: row.labels,
+        task: structuredClone(task),
+      });
       return structuredClone(task);
     },
     get: async (id, authorizationKey) => {
@@ -101,7 +115,59 @@ export const createMemoryA2aTaskStore = (): A2aTaskStore => {
         totalSize: filtered.length,
       };
     },
-    save: async (task, authorizationKey) => {
+    listForOperator: async (request) => {
+      const offset = pageOffset(request.pageToken);
+      const pageSize = Math.min(100, Math.max(1, request.pageSize ?? 50));
+      const timestampAfter =
+        request.statusTimestampAfter === undefined
+          ? undefined
+          : Date.parse(request.statusTimestampAfter);
+      if (timestampAfter !== undefined && !Number.isFinite(timestampAfter)) {
+        throw new Error("Invalid statusTimestampAfter");
+      }
+      const labels = Object.entries(request.labels ?? {});
+      const filtered = [...rows.values()]
+        .filter((row) =>
+          labels.every(([key, value]) => row.labels[key] === value),
+        )
+        .filter(
+          (row) =>
+            (request.contextId === undefined ||
+              row.task.contextId === request.contextId) &&
+            (request.status === undefined ||
+              row.task.status.state === request.status) &&
+            (timestampAfter === undefined ||
+              (row.task.status.timestamp !== undefined &&
+                Date.parse(row.task.status.timestamp) >= timestampAfter)),
+        )
+        .sort((left, right) =>
+          (right.task.status.timestamp ?? "").localeCompare(
+            left.task.status.timestamp ?? "",
+          ),
+        );
+      const items: A2aOperatorTask[] = filtered
+        .slice(offset, offset + pageSize)
+        .map((row) => ({
+          labels: structuredClone(row.labels),
+          task: structuredClone(
+            visibleTask(
+              row.task,
+              request.historyLength ?? 0,
+              request.includeArtifacts === true,
+            ),
+          ),
+        }));
+      return {
+        items,
+        nextPageToken:
+          offset + items.length < filtered.length
+            ? btoa(String(offset + items.length))
+            : "",
+        pageSize,
+        totalSize: filtered.length,
+      };
+    },
+    save: async (task, authorizationKey, labels) => {
       const existing = rows.get(task.id);
       if (existing && existing.authorizationKey !== authorizationKey) {
         throw new Error("A2A task ownership cannot be changed");
@@ -113,7 +179,11 @@ export const createMemoryA2aTaskStore = (): A2aTaskStore => {
       ) {
         throw new Error("A2A terminal task cannot be changed");
       }
-      rows.set(task.id, { authorizationKey, task: structuredClone(task) });
+      rows.set(task.id, {
+        authorizationKey,
+        labels: structuredClone(labels ?? existing?.labels ?? {}),
+        task: structuredClone(task),
+      });
     },
   };
 };

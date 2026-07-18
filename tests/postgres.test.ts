@@ -10,7 +10,26 @@ describe("A2A PostgreSQL task store", () => {
     const sql = a2aPostgresSchemaSql();
     expect(sql).toContain("authorization_key");
     expect(sql).toContain("a2a_tasks_context_idx");
+    expect(sql).toContain("a2a_tasks_labels_idx");
     expect(() => a2aPostgresSchemaSql("bad-name")).toThrow();
+  });
+
+  test("operator task queries are bounded by host-controlled labels", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const client: A2aSqlClient = {
+      query: async <Row>(text: string, values?: readonly unknown[]) => {
+        calls.push({ text, values });
+        return { rows: [] as Row[] };
+      },
+    };
+    await createPostgresA2aTaskStore({ client }).listForOperator({
+      labels: { transport: "a2a", userId: "user-1" },
+    });
+    expect(calls[0]?.text).toContain("labels @> $1::jsonb");
+    expect(calls[0]?.values?.[0]).toBe(
+      JSON.stringify({ transport: "a2a", userId: "user-1" }),
+    );
+    expect(calls[0]?.text).not.toContain("authorization_key");
   });
 
   test("cancellation protects terminal states and ownership in SQL", async () => {

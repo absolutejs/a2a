@@ -125,6 +125,67 @@ describe("A2A 1.0 server and client", () => {
     expect(unauthorized?.status).toBe(401);
   });
 
+  test("persists authentication-controlled labels for bounded operator views", async () => {
+    const taskStore = createMemoryA2aTaskStore();
+    const handler = createA2aHandler({
+      agentCard: card,
+      authorize: () => ({
+        actor: { agentId: "agent-1", scopes: ["a2a"], userId: "user-1" },
+        authorizationKey: "private-owner-key",
+        caller: {},
+        ok: true,
+        taskLabels: {
+          clientId: "agent-1",
+          transport: "a2a",
+          userId: "user-1",
+        },
+      }),
+      sendMessage: ({ message }) => ({
+        task: {
+          artifacts: [
+            { artifactId: "secret", parts: [{ text: "private output" }] },
+          ],
+          contextId: "context-1",
+          history: [message],
+          id: "operator-task",
+          status: { state: "TASK_STATE_COMPLETED" },
+        },
+      }),
+      taskStore,
+    });
+    await handler(
+      new Request("https://agent.test/a2a", {
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "SendMessage",
+          params: {
+            message: {
+              messageId: "operator",
+              parts: [{ text: "hello" }],
+              role: "ROLE_USER",
+            },
+          },
+        }),
+        headers: {
+          "a2a-version": "1.0",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      }),
+    );
+    const visible = await taskStore.listForOperator({
+      labels: { transport: "a2a", userId: "user-1" },
+    });
+    expect(visible.totalSize).toBe(1);
+    expect(visible.items[0]?.labels.clientId).toBe("agent-1");
+    expect(visible.items[0]?.task.artifacts).toBeUndefined();
+    expect(visible.items[0]?.task.history).toEqual([]);
+    expect(
+      await taskStore.listForOperator({ labels: { userId: "user-2" } }),
+    ).toMatchObject({ totalSize: 0 });
+  });
+
   test("returns an approvable action and resumes that exact action", async () => {
     const agency = createAgency({
       policy: {

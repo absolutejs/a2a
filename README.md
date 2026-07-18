@@ -83,3 +83,26 @@ issues a single-use lease, and records the execution receipt.
 Task ownership is always keyed by the authorization result. A caller cannot
 probe, list, cancel, or overwrite another caller's task, and PostgreSQL updates
 protect terminal task states atomically.
+
+Hosts that operate multi-agent fleets can attach trusted labels in the
+authorization result and use the separate operator view. Labels are never read
+from A2A request data. Operator results omit task artifacts and history unless
+explicitly requested, so a status console does not accidentally retrieve task
+payloads.
+
+```ts
+const taskStore = createPostgresA2aTaskStore({ client });
+
+const authorized = {
+  actor,
+  authorizationKey,
+  caller,
+  ok: true as const,
+  taskLabels: { clientId: actor.agentId, tenantId: tenant.id },
+};
+
+const posture = await taskStore.listForOperator({
+  labels: { tenantId: tenant.id },
+  pageSize: 25,
+});
+```

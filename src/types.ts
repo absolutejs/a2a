@@ -164,6 +164,24 @@ export type A2aListTasksResponse = {
   totalSize: number;
 };
 
+export type A2aTaskLabels = Record<string, string>;
+
+export type A2aOperatorListTasksRequest = A2aListTasksRequest & {
+  labels?: A2aTaskLabels;
+};
+
+export type A2aOperatorTask = {
+  labels: A2aTaskLabels;
+  task: A2aTask;
+};
+
+export type A2aOperatorListTasksResponse = {
+  items: A2aOperatorTask[];
+  nextPageToken: string;
+  pageSize: number;
+  totalSize: number;
+};
+
 export type A2aPushNotificationConfig = {
   authentication?: { credentials?: string; scheme: string };
   id?: string;
@@ -207,18 +225,35 @@ export type A2aTaskStore = {
     authorizationKey: string,
     request: A2aListTasksRequest,
   ) => Promise<A2aListTasksResponse>;
-  save: (task: A2aTask, authorizationKey: string) => Promise<void>;
+  save: (
+    task: A2aTask,
+    authorizationKey: string,
+    labels?: A2aTaskLabels,
+  ) => Promise<void>;
+};
+
+export type A2aTaskOperatorStore = {
+  listForOperator: (
+    request: A2aOperatorListTasksRequest,
+  ) => Promise<A2aOperatorListTasksResponse>;
 };
 
 export type A2aAuthResult<Caller> =
   | { ok: false; reason?: string; status?: 401 | 403 }
-  | { actor: AgentActor; authorizationKey: string; caller: Caller; ok: true };
+  | {
+      actor: AgentActor;
+      authorizationKey: string;
+      caller: Caller;
+      ok: true;
+      taskLabels?: A2aTaskLabels;
+    };
 
 export type A2aRequestContext<Caller> = {
   actor: AgentActor;
   authorizationKey: string;
   caller: Caller;
   request: Request;
+  taskLabels?: A2aTaskLabels;
 };
 
 export type A2aAgencyOptions<Caller> = {
