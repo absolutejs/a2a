@@ -3,6 +3,23 @@ import { Type } from "@sinclair/typebox";
 
 export const manifest = defineManifest<Record<string, never>>()({
   contract: 2,
+  discovery: {
+    audiences: ["agent-hosts", "agent-clients"],
+    intents: [
+      "serve an A2A agent",
+      "call an A2A agent",
+      "manage durable agent tasks",
+    ],
+    keywords: [
+      "agents",
+      "a2a",
+      "agent-card",
+      "tasks",
+      "streaming",
+      "push-notifications",
+    ],
+    protocols: ["A2A 1.0"],
+  },
   identity: {
     accent: "#8b5cf6",
     category: "ai",
