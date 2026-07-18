@@ -60,6 +60,31 @@ export const createMemoryA2aTaskStore = (): A2aTaskStore &
       });
       return structuredClone(task);
     },
+    cancelForOperator: async (id, labels, now) => {
+      const row = rows.get(id);
+      if (
+        !row ||
+        !Object.entries(labels).every(
+          ([key, value]) => row.labels[key] === value,
+        ) ||
+        terminal.has(row.task.status.state)
+      ) {
+        return undefined;
+      }
+      const task: A2aTask = {
+        ...row.task,
+        status: { state: "TASK_STATE_CANCELED", timestamp: now },
+      };
+      rows.set(id, {
+        authorizationKey: row.authorizationKey,
+        labels: row.labels,
+        task: structuredClone(task),
+      });
+      return {
+        labels: structuredClone(row.labels),
+        task: structuredClone(visibleTask(task, 0, false)),
+      };
+    },
     get: async (id, authorizationKey) => {
       const row = rows.get(id);
       return row?.authorizationKey === authorizationKey

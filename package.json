@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/a2a",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Production A2A Protocol 1.0 client and server with streaming, durable tasks, push configuration, and Agency enforcement.",
   "type": "module",
   "license": "MIT",

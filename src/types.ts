@@ -233,6 +233,11 @@ export type A2aTaskStore = {
 };
 
 export type A2aTaskOperatorStore = {
+  cancelForOperator: (
+    id: string,
+    labels: A2aTaskLabels,
+    now: string,
+  ) => Promise<A2aOperatorTask | undefined>;
   listForOperator: (
     request: A2aOperatorListTasksRequest,
   ) => Promise<A2aOperatorListTasksResponse>;

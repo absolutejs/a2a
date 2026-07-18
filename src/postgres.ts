@@ -96,6 +96,19 @@ export const createPostgresA2aTaskStore = ({
       );
       return taskOf(result.rows[0]);
     },
+    cancelForOperator: async (id, labels, now) => {
+      const result = await client.query<OperatorTaskRow>(
+        `UPDATE ${ns}.tasks SET state = 'TASK_STATE_CANCELED', data = jsonb_set(jsonb_set(data, '{status,state}', '"TASK_STATE_CANCELED"'::jsonb, true), '{status,timestamp}', to_jsonb($3::text), true), updated_at = $3::timestamptz
+         WHERE task_id = $1 AND labels @> $2::jsonb AND state NOT IN ('TASK_STATE_COMPLETED','TASK_STATE_CANCELED','TASK_STATE_FAILED','TASK_STATE_REJECTED') RETURNING labels, data`,
+        [id, JSON.stringify(labels), now],
+      );
+      const row = result.rows[0];
+      if (!row) return undefined;
+      return {
+        labels: labelsOf(row),
+        task: visibleTask(taskOf(row) as A2aTask, 0, false),
+      };
+    },
     get: async (id, authorizationKey) =>
       taskOf(
         (

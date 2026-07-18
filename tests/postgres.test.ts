@@ -49,6 +49,30 @@ describe("A2A PostgreSQL task store", () => {
     expect(calls[0]).toContain("state NOT IN");
   });
 
+  test("operator cancellation is atomically bounded by host labels", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const client: A2aSqlClient = {
+      query: async <Row>(text: string, values?: readonly unknown[]) => {
+        calls.push({ text, values });
+        return { rows: [] as Row[] };
+      },
+    };
+    await createPostgresA2aTaskStore({ client }).cancelForOperator(
+      "task",
+      { clientId: "client-1", transport: "a2a", userId: "user-1" },
+      new Date().toISOString(),
+    );
+    expect(calls[0]?.text).toContain("labels @> $2::jsonb");
+    expect(calls[0]?.text).toContain("state NOT IN");
+    expect(calls[0]?.values?.[1]).toBe(
+      JSON.stringify({
+        clientId: "client-1",
+        transport: "a2a",
+        userId: "user-1",
+      }),
+    );
+  });
+
   test("upserts cannot overwrite another owner or mutate terminal tasks", async () => {
     const calls: string[] = [];
     const client: A2aSqlClient = {
