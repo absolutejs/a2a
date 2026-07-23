@@ -11,6 +11,7 @@ export {
   type A2aSqlClient,
   type A2aSqlResult,
 } from "./postgres";
+export { a2aDrizzleSchema, createDrizzleA2aTaskStore } from "./drizzle";
 export { createA2aHandler, withAgencyExtension } from "./server";
 export { createMemoryA2aTaskStore } from "./store";
 export {
