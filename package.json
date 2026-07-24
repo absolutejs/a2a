@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/a2a",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Production A2A Protocol 1.0 client and server with streaming, durable tasks, push configuration, and Agency enforcement.",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,7 @@
     "manifestContract": 2,
     "runtimePeers": {
       "@absolutejs/agency": {
+        "artifactImports": [],
         "range": ">=0.7.1 <0.8.0",
         "tested": "0.7.1",
         "buildExternals": [
@@ -50,7 +51,7 @@
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.6.0",
+    "@absolutejs/manifest": "^0.6.3",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
