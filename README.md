@@ -6,6 +6,11 @@ paginated task listing, push notification configuration, authenticated extended
 cards, explicit version and extension negotiation, and AbsoluteJS Agency
 enforcement.
 
+Agency is a required host peer (`>=0.7.1 <0.8.0`), not a bundled dependency.
+The host therefore owns one action ledger and one contract version across A2A
+and every other agent transport. This package tests against exactly `0.7.1`;
+support for a new Agency minor requires an explicit compatibility release.
+
 Protocol reference: <https://a2a-protocol.org/latest/specification/>
 
 The protocol version is intentionally pinned. A2A 1.0 changed its JSON-RPC
