@@ -30,6 +30,11 @@ export const manifest = defineManifest<Record<string, never>>()({
     tagline:
       "Let authorized agents collaborate over the accepted A2A standard.",
   },
+  integration: {
+    description:
+      "The host must bind bearer authorization, caller identity, Agency enforcement, and a durable caller-fenced task store before mounting an A2A endpoint.",
+    mode: "code-first",
+  },
   settings: Type.Object({}),
   wiring: [],
 });

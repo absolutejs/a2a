@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/a2a",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Production A2A Protocol 1.0 client and server with streaming, durable tasks, push configuration, and Agency enforcement.",
   "type": "module",
   "license": "MIT",
@@ -18,11 +18,23 @@
     "runtimePeers": {
       "@absolutejs/agency": {
         "artifactImports": [],
-        "range": ">=0.7.1 <0.8.0",
-        "tested": "0.7.1",
+        "range": ">=0.7.3 <0.8.0",
+        "tested": "0.7.3",
         "buildExternals": [
           "@absolutejs/agency",
           "@absolutejs/agency/*"
+        ]
+      },
+      "drizzle-orm": {
+        "artifactImports": [
+          "drizzle-orm",
+          "drizzle-orm/pg-core"
+        ],
+        "range": ">=1.0.0-rc.4 <2",
+        "tested": "1.0.0-rc.4",
+        "buildExternals": [
+          "drizzle-orm",
+          "drizzle-orm/*"
         ]
       }
     }
@@ -51,18 +63,18 @@
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.6.3",
+    "@absolutejs/manifest": "^0.7.3",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
-    "@absolutejs/agency": "0.7.1",
+    "@absolutejs/agency": "0.7.3",
     "@types/bun": "^1.3.14",
     "prettier": "3.5.3",
     "typescript": "5.8.3",
     "drizzle-orm": "1.0.0-rc.4"
   },
   "peerDependencies": {
-    "@absolutejs/agency": ">=0.7.1 <0.8.0",
+    "@absolutejs/agency": ">=0.7.3 <0.8.0",
     "drizzle-orm": ">=1.0.0-rc.4 <2"
   }
 }

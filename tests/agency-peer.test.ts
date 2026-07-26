@@ -17,10 +17,10 @@ describe("Agency dependency ownership", () => {
       packageContract.dependencies?.["@absolutejs/agency"],
     ).toBeUndefined();
     expect(packageContract.peerDependencies?.["@absolutejs/agency"]).toBe(
-      ">=0.7.1 <0.8.0",
+      ">=0.7.3 <0.8.0",
     );
     expect(packageContract.devDependencies?.["@absolutejs/agency"]).toBe(
-      "0.7.1",
+      "0.7.3",
     );
     expect(packageContract.scripts?.build).toContain(
       "--external @absolutejs/agency",
