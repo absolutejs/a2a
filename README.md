@@ -17,6 +17,8 @@ The protocol version is intentionally pinned. A2A 1.0 changed its JSON-RPC
 method names and Agent Card shape from 0.3; this package does not silently
 downgrade and lose security or behavior.
 
+## Security boundaries
+
 Discovery and RPC clients require HTTPS outside localhost, reject credentials
 in URLs and redirects, enforce timeouts and response-size limits, and validate
 response media types. Servers authenticate before parsing bodies, cap request
@@ -53,6 +55,8 @@ const a2a = createA2aHandler({
 });
 ```
 
+## Optional protocol capabilities
+
 The same handler supports the A2A 1.0 optional methods when their advertised
 capabilities are configured:
 
@@ -80,14 +84,20 @@ the included memory store. Webhook delivery should independently resolve DNS,
 block private and link-local destinations, avoid redirects, authenticate each
 request, and retry idempotently.
 
+## Agency approval flow
+
 When policy requires approval, the server returns an A2A extension error with
 the Agency `actionId`. After approval, resend the same request with that ID at
 `metadata[ABSOLUTE_AGENCY_EXTENSION].actionId`; Agency re-evaluates policy,
 issues a single-use lease, and records the execution receipt.
 
+## Task isolation
+
 Task ownership is always keyed by the authorization result. A caller cannot
 probe, list, cancel, or overwrite another caller's task, and PostgreSQL updates
 protect terminal task states atomically.
+
+## Operator posture
 
 Hosts that operate multi-agent fleets can attach trusted labels in the
 authorization result and use the separate operator view. Labels are never read
